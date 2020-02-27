@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<style type="text/css">
+
+.hidden {
+    transition: opacity 1s ease-out;
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+}
+/*.visible {
+    opacity: 1;
+    height: auto;
+}
+*/
+.highlighted {
+	background-color: yellow;
+}
+#droppable-tests { 
+	width: 800px; 
+	height: 150px; 
+	padding: 0.5em; 
+	float: left; 
+	margin: 10px;
+    border-radius: 5px;
+}
+#droppable-consequences { 
+	width: 800px; 
+	height: 150px; 
+	padding: 0.5em; 
+	float: left; 
+	margin: 10px;
+    border-radius: 5px;
+}
+
+.textblock {
+  border-radius: 5px;
+  background: #adab2157;
+  display: inline-block;
+  border: 2px solid Black;
+  padding: 5px 10px 5px 10px;
+  margin: 10px 10px 10px 10px;
+}
+
+.subset-tests {
+	background: #2198adb3;
+}
+
+.subset-consequences {
+	background: #ad21ad6e;
+}
+
+.x {
+    position: absolute;
+    background: red;
+    color: white;
+    top: -10px;
+    right: -10px;
+}
+
+
+
+
+</style>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<body>
+<h1>Labeling Task</h1>
+<p>There are {{ paper_count }} articles to tag.</p>
+<table class="table table-hover">
+  {% for task in input %}
+    <tr>
+      <td style="width: 40%">
+      	<div class="law_text" doc_key="{{task.doc_key}}">{{ task.full_text | replace("\n","<br>") | safe}}</div>
+      </td>
+      <td style="width: 60%">
+	    <div class="error {{loop.index}} question" doc_key="{{task.doc_key}}" >
+		  <p>
+    	  <h4>Does this document have parsing/display errors?</h4>
+    	  <div class="btn-group btn-group-toggle" role="group" data-toggle="buttons">
+			<label class="btn btn-outline-success btn-lg active" label="legit">
+				<input type="radio" name="options" autocomplete="off" checked>No errors</label>
+			<label class="btn btn-outline-danger btn-lg" label="errors">
+				<input type="radio" name="options" autocomplete="off" checked>Errors</label>
+		  </div>
+		  </p>
+		</div>
+		<div class="click_description">
+			<p><h4> Please Select Paragraphs </h4></p>
+		</div>
+		<div class="textblock_pool" doc_key="{{task.doc_key}}" ></div>
+      </td>
+    </tr>
+  {% endfor %}
+</table>
+
+<button type="button" class="btn btn-danger btn-lg submit">Submit</button>
+</body>
+
+<script type="text/javascript">
+    String.prototype.replaceAll = function(search, replacement) {
+        var target = this;
+        return target.replace(new RegExp(search, 'g'), replacement);
+    };
+
+    function get_button_html(doc_key){
+		outer_div = document.createElement('div')
+		$(outer_div).addClass("label main question").attr('doc_key', doc_key)
+
+    	button_div = document.createElement('div')
+    	$(button_div).addClass("btn-group-md btn-group-toggle")
+    				.attr('role', 'group',)
+    				.attr('data-toggle', 'buttons')
+
+
+    	buttons = [['LEAD', 'btn-outline-primary', 'Lead'],
+					['MAIN', 'btn-outline-primary', 'Main Events '],
+					['SECD', 'btn-outline-primary', 'Secondary Events '],
+					['CONS', 'btn-outline-primary', 'Consequences'],
+					['CIRC', 'btn-outline-primary', 'Circumstances'],
+					['PREV', 'btn-outline-primary', 'Previous Events'],
+					['HIST', 'btn-outline-primary', 'History'],
+					['VERB', 'btn-outline-primary', 'Verbal Reactions'],
+					['EXPE', 'btn-outline-primary', 'Expectations'],
+					['EXPL', 'btn-outline-primary', 'Explanations'],
+					['EVAL', 'btn-outline-primary', 'Evaluations']]
+
+		row_len = 4
+		sub_button_div = document.createElement('div')
+		$(sub_button_div).addClass('btn-group btn-group-justified')
+    	for (i=0; i < buttons.length; i++){
+    		tag = buttons[i][0], text = buttons[i][2], button_type = buttons[i][1]
+			// 
+	    	label = document.createElement('label')
+	    	$(label).addClass("btn " + button_type + " btn-default").attr('label', tag)
+	    	label.textContent = text
+	    	// 
+	    	input = document.createElement('input')
+	    	$(input).attr('type', 'radio').attr('name', 'options').attr('autocomplete', 'off')
+	    	// 
+	    	$(input).appendTo(label)
+	    	$(sub_button_div).append(label)
+	    	if (i > 0 && i % row_len == 0){
+	    		$(button_div).append(sub_button_div)
+				sub_button_div = document.createElement('div')
+				$(sub_button_div).addClass('btn-group btn-group-justified')	    		
+	    	}
+		}
+		$(button_div).append(sub_button_div)
+		$(outer_div).append(button_div)
+		return outer_div
+    }
+
+	function get_selection() {
+	    if (window.getSelection) {
+	        sel = window.getSelection();
+	    } else if (document.selection && document.selection.type != "Control") {
+	        sel = document.selection.createRange();
+	    }
+	    return sel;
+	}
+
+	var highlighted_counter = 0
+	function hightlight_text(thisDiv){
+	    $(thisDiv).on("mouseup", function () {
+	    	var curr_counter = highlighted_counter
+	    	// create span element
+	        var span_elem = document.createElement('span')
+	        $(span_elem).addClass('highlighted').attr('id', 'highlighted-' + curr_counter)
+	        // get and update selection
+	        var selection = get_selection();
+	        var selected_text = selection.toString()
+	        var range = selection.getRangeAt(0)
+		    span_elem.appendChild(range.extractContents());
+		    range.insertNode(span_elem);
+	        // get doc id
+	        var doc_key = $(this).attr('doc_key')
+	        // create textblock element
+	        var textblock_pool = $('.textblock_pool').filter(function(index) {return $(this).attr('doc_key') == doc_key})
+	        // create textblock div
+	        var textblock_div = document.createElement('div')
+	        $(textblock_div).addClass('textblock').attr('doc_key', doc_key)
+	        var textblock_span = document.createElement('span')
+	        textblock_span.textContent = selected_text
+	        $(textblock_div).append(textblock_span)
+	        button_div = get_button_html(doc_key)
+	        $(textblock_div).append(button_div)
+
+        	var textblock = $(textblock_div).appendTo(textblock_pool)
+        	var x = $('<button class="x">X</button>').appendTo(textblock)
+			textblock.draggable(); // { revert: "invalid" });
+			// handle X
+			x.on('click', function(){
+				textblock.remove()
+				$('#highlighted-' + curr_counter).removeClass('highlighted')
+			})
+			highlighted_counter++
+	    });
+	}
+
+	hightlight_text('.law_text')
+
+	// submit answers
+	$('.submit').click(function() {
+		alert('submitting...')
+		output = [] 
+		// gather questions
+		$('.question').each(function(i, d) {
+			doc_key = $(d).attr('doc_key')
+			question_class = $(d).attr('class').split(' ')[0]
+			label = $(d).find('label.active').attr('label')
+
+			paragraph_text = ''
+			if (question_class == 'label'){
+				paragraph_text = $(d).parent().find('span').text()
+			}
+			// 
+			output = output.concat({
+				"doc_key": doc_key,
+				"question_class": question_class,
+				"label": label,
+				'paragraph_text': paragraph_text,
+			})
+		})		
+
+	    $.ajax({
+	        url: "/post_annotation_experiment",
+	        type: 'POST',
+	        contentType: 'application/json',
+	        data: JSON.stringify({"data": output}),
+	        success: function(result) {
+	            if(result === "success") location.href = "/render_annotation_experiment"
+	        }
+	    });
+	})
+
+</script>
+</html>

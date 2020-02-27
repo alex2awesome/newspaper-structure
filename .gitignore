@@ -1,0 +1,10 @@
+*.json
+*.pkl
+*.csv
+*.txt
+*__pycache__
+*.ipynb_checkpoints
+*restats
+data
+cython_tests
+.idea
