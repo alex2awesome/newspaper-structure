@@ -12,6 +12,7 @@ from libc.stdlib cimport rand, RAND_MAX
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 import cython 
 import os
+import json
 
 DTYPE = np.intc
 
@@ -31,7 +32,7 @@ cdef int categorical(int k, double[:] p) nogil:
             return i;
         rnd -= p[i];
 
-cdef int bernoilli(float p) nogil:
+cdef int bernoilli(double p) nogil:
     cdef double r = random_double(1)
     if r < p:
         return 1
@@ -43,52 +44,68 @@ cdef class BOW_Paragraph_GibbsSampler():
     cdef int ***docs 
     cdef int[:] num_pars_per_doc
     cdef int **num_words_per_par_per_doc
+    cdef int **labels
+    cdef bint *doc_has_labels
 
     cdef int n_docs, n_graphs, n_vocab, num_partypes, num_topics, max_graphs_per_doc
-    cdef float H_T, H_P, gamma, alpha, beta
+    cdef double H_T, H_P, gamma, alpha, beta
     
     cdef int[:] partype_counts, doc__wordtopic_counts, partype__wordtopic_counts, wordtopic__word_counts
     cdef int[:, :] doc_by_wordtopic__wordtopic_counts, partype_by_wordtopic__wordtopic_counts, vocab_by_wordtopic__word_counts
-    cdef int[:, :] pardoc_to_type, old_pardoc_to_type
+    cdef int** pardoc_to_type
+    cdef int** old_pardoc_to_type
     cdef int*** word_to_topic
     cdef int*** switching_variable
     cdef int*** old_switching_variable
 
-    cdef public np.ndarray par_doc_to_type, doc_by_wordtopic, partype_by_wordtopic, vocab_by_wordtopic, switching_variable_counts
+    cdef public np.ndarray doc_by_wordtopic, partype_by_wordtopic, vocab_by_wordtopic, switching_variable_counts
+    cdef public list par_doc_to_type
 
     cdef double[:] par_prob_vec, par_wordtopic_prob_vec, doc_wordtopic_prob_vec
 
 
     def __cinit__(
         self, list docs, list vocab, int num_partypes=10, int num_topics=25,
-        float H_P_prior=1, float H_T_prior=1, float gamma=.7, float alpha=1., float beta=1.
+        double H_P_prior=1, double H_T_prior=1, double gamma=.7, double alpha=1., double beta=1.
     ):
         # copy word-level and paragraph-level data
-        self.docs = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
-        self.word_to_topic = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
-        self.switching_variable = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
-        self.old_switching_variable = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
-        self.num_words_per_par_per_doc = <int**>PyMem_Malloc(len(docs) * sizeof(int*))
+        self.docs                                = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
+        self.word_to_topic                       = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
+        self.switching_variable                  = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
+        self.old_switching_variable              = <int***>PyMem_Malloc(len(docs) * sizeof(int**))
+        self.num_words_per_par_per_doc           =  <int**>PyMem_Malloc(len(docs) * sizeof(int*))
+        self.labels                              =  <int**>PyMem_Malloc(len(docs) * sizeof(int*))
+        self.pardoc_to_type                      =  <int**>PyMem_Malloc(len(docs) * sizeof(int*))
+        self.old_pardoc_to_type                  =  <int**>PyMem_Malloc(len(docs) * sizeof(int*))
+        self.doc_has_labels                      =  <bint*>PyMem_Malloc(len(docs) * sizeof(bint))
         cdef int i, j, k
+        ## document-level for-loop
         for i in range(len(docs)):
-            self.docs[i] = <int**> PyMem_Malloc(len(docs[i]) * sizeof(int*))
-            self.word_to_topic[i] = <int**> PyMem_Malloc(len(docs[i]) * sizeof(int*))
-            self.switching_variable[i] = <int**> PyMem_Malloc(len(docs[i]) * sizeof(int*))
-            self.old_switching_variable[i] = <int**> PyMem_Malloc(len(docs[i]) * sizeof(int*))
-            self.num_words_per_par_per_doc[i] = <int*> PyMem_Malloc(len(docs[i]) * sizeof(int))
-            for j in range(len(docs[i])):
-                self.docs[i][j] = <int*> PyMem_Malloc(len(docs[i][j]) * sizeof(int))
-                self.word_to_topic[i][j] = <int*> PyMem_Malloc(len(docs[i][j]) * sizeof(int))
-                self.switching_variable[i][j] = <int*> PyMem_Malloc(len(docs[i][j]) * sizeof(int))
-                self.old_switching_variable[i][j] = <int*> PyMem_Malloc(len(docs[i][j]) * sizeof(int))
-                self.num_words_per_par_per_doc[i][j] = len(docs[i][j])
-                for k in range(len(docs[i][j])):
-                    self.docs[i][j][k] = docs[i][j][k]
+            self.docs[i]                         = <int**> PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int*))
+            self.word_to_topic[i]                = <int**> PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int*))
+            self.switching_variable[i]           = <int**> PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int*))
+            self.old_switching_variable[i]       = <int**> PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int*))
+            self.num_words_per_par_per_doc[i]    = <int*>  PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int))
+            self.labels[i]                       = <int*>  PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int))
+            self.pardoc_to_type[i]               = <int*>  PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int))
+            self.old_pardoc_to_type[i]           = <int*>  PyMem_Malloc(len(docs[i]['paragraphs']) * sizeof(int))
+            self.doc_has_labels[i]               = docs[i]['has_labels']
+            ## paragraph-level
+            for j in range(len(docs[i]['paragraphs'])):
+                self.docs[i][j]                      = <int*> PyMem_Malloc(len(docs[i]['paragraphs'][j]) * sizeof(int))
+                self.word_to_topic[i][j]             = <int*> PyMem_Malloc(len(docs[i]['paragraphs'][j]) * sizeof(int))
+                self.switching_variable[i][j]        = <int*> PyMem_Malloc(len(docs[i]['paragraphs'][j]) * sizeof(int))
+                self.old_switching_variable[i][j]    = <int*> PyMem_Malloc(len(docs[i]['paragraphs'][j]) * sizeof(int))
+                self.num_words_per_par_per_doc[i][j] = len(docs[i]['paragraphs'][j])
+                self.labels[i][j]                    = docs[i]['labels'][j]
+                ## word-level
+                for k in range(len(docs[i]['paragraphs'][j])):
+                    self.docs[i][j][k] = docs[i]['paragraphs'][j][k]
             
-        self.num_pars_per_doc = np.array(list(map(lambda x: len(x), docs)), dtype=DTYPE)
+        self.num_pars_per_doc = np.array(list(map(lambda x: len(x['paragraphs']), docs)), dtype=DTYPE)
         self.n_docs = len(docs)
-        self.n_graphs = sum(list(map(lambda x: len(x), docs)))
-        self.max_graphs_per_doc = max(list(map(lambda x: len(x), docs)))
+        self.n_graphs = sum(list(map(lambda x: len(x['paragraphs']), docs)))
+        self.max_graphs_per_doc = max(list(map(lambda x: len(x['paragraphs']), docs)))
         self.n_vocab = len(vocab)
 
         # hyperparameters
@@ -111,8 +128,6 @@ cdef class BOW_Paragraph_GibbsSampler():
         #### I(doc d has type t)
         #### count_t_d
         self.partype_counts = np.zeros(self.num_partypes, dtype=DTYPE)
-        self.pardoc_to_type = np.zeros((self.n_docs, self.max_graphs_per_doc), dtype=DTYPE)
-        self.old_pardoc_to_type = np.zeros((self.n_docs, self.max_graphs_per_doc), dtype=DTYPE)
 
         ## background word-topic probabilities
         #### I(doc d has type t, word w has topic k)
@@ -139,10 +154,14 @@ cdef class BOW_Paragraph_GibbsSampler():
         ## iterate through documents
         for doc_id in range(self.n_docs):
             for par_id in range(self.num_pars_per_doc[doc_id]):
-                partype = categorical(self.num_partypes, p=self.par_prob_vec)
+                if not self.doc_has_labels[doc_id]:
+                    partype = categorical(self.num_partypes, p=self.par_prob_vec)
+                else:
+                    partype = self.labels[doc_id][par_id]
+
                 self.partype_counts[partype] += 1
-                self.pardoc_to_type[doc_id, par_id] = partype
-                self.old_pardoc_to_type[doc_id, par_id] = partype
+                self.pardoc_to_type[doc_id][par_id] = partype
+                self.old_pardoc_to_type[doc_id][par_id] = partype
 
                 for word_id in range(self.num_words_per_par_per_doc[doc_id][par_id]):
                     word = self.docs[doc_id][par_id][word_id]
@@ -175,7 +194,7 @@ cdef class BOW_Paragraph_GibbsSampler():
     ###
     cdef double partype_prob(self, int proposed_partype, int doc_id, int par_id) nogil:
         ## partype factor
-        cdef float partype_term = log(self.H_T + self.partype_counts[proposed_partype])
+        cdef double partype_term = log(self.H_T + self.partype_counts[proposed_partype])
 
         ## paragraph word_topic factor
         cdef double paragraph_wordtopic_term = 0
@@ -209,15 +228,16 @@ cdef class BOW_Paragraph_GibbsSampler():
         cdef int old_partype, new_partype
         for doc_id in range(self.n_docs):
             for par_id in range(self.num_pars_per_doc[doc_id]):
-                old_partype = self.pardoc_to_type[doc_id, par_id]
-                ## decrement
-                self.partype_counts[old_partype] -= 1
-                new_partype = self.propose_new_partype(doc_id, par_id)
-                ## increment
-                self.partype_counts[new_partype] += 1
-                ## cache
-                self.pardoc_to_type[doc_id, par_id] = new_partype
-                self.old_pardoc_to_type[doc_id, par_id] = old_partype
+                if not self.doc_has_labels[doc_id]:
+                    old_partype = self.pardoc_to_type[doc_id][par_id]
+                    ## decrement
+                    self.partype_counts[old_partype] -= 1
+                    new_partype = self.propose_new_partype(doc_id, par_id)
+                    ## increment
+                    self.partype_counts[new_partype] += 1
+                    ## cache
+                    self.pardoc_to_type[doc_id][par_id] = new_partype
+                    self.old_pardoc_to_type[doc_id][par_id] = old_partype
 
     ##
     # Sample switching variable...
@@ -241,7 +261,7 @@ cdef class BOW_Paragraph_GibbsSampler():
         return (1 - self.gamma) * wordtopic_term
 
     cdef int sample_switching_variable(self, int doc_id, int par_id, int word_id) nogil:
-        cdef int partype = self.pardoc_to_type[doc_id, par_id]
+        cdef int partype = self.pardoc_to_type[doc_id][par_id]
         cdef int wordtopic = self.word_to_topic[doc_id][par_id][word_id]
         cdef double p_s_0 = self.switching_prob_0(partype, wordtopic)
         cdef double p_s_1 = self.switching_prob_1(doc_id, wordtopic)
@@ -276,7 +296,7 @@ cdef class BOW_Paragraph_GibbsSampler():
 
     cdef double par_wordtopic_prob(self, int proposed_wordtopic, int doc_id, int par_id, int word_id) nogil:
         cdef int word = self.docs[doc_id][par_id][word_id]
-        cdef int partype = self.pardoc_to_type[doc_id, par_id]
+        cdef int partype = self.pardoc_to_type[doc_id][par_id]
 
         ## source word_topic factor
         cdef double wordtopic_term = self.H_P + self.partype_by_wordtopic__wordtopic_counts[partype, proposed_wordtopic]
@@ -303,8 +323,8 @@ cdef class BOW_Paragraph_GibbsSampler():
         cdef int old_partype, partype, old_switching_variable, wordtopic, s
         for doc_id in range(self.n_docs):
             for par_id in range(self.num_pars_per_doc[doc_id]):
-                old_partype = self.old_pardoc_to_type[doc_id, par_id]
-                partype = self.pardoc_to_type[doc_id, par_id]
+                old_partype = self.old_pardoc_to_type[doc_id][par_id]
+                partype = self.pardoc_to_type[doc_id][par_id]
                 ##
                 for word_id in range(self.num_words_per_par_per_doc[doc_id][par_id]):
                     old_switching_var = self.switching_variable[doc_id][par_id][word_id]
@@ -331,7 +351,14 @@ cdef class BOW_Paragraph_GibbsSampler():
                     self.word_to_topic[doc_id][par_id][word_id] = wordtopic
 
     def pythonize_vars(self):
-        self.par_doc_to_type = np.asarray(self.pardoc_to_type)
+        ## convert pointer to pointers => list of lists
+        self.par_doc_to_type = []
+        for i in range(self.n_docs):
+            self.par_doc_to_type.append([])
+            for j in range(self.num_pars_per_doc[i]):
+                self.par_doc_to_type[i].append(self.pardoc_to_type[i][j])
+
+        ## memoryview => numpy array
         self.doc_by_wordtopic = np.asarray(self.doc_by_wordtopic__wordtopic_counts)
         self.partype_by_wordtopic = np.asarray(self.partype_by_wordtopic__wordtopic_counts)
         self.vocab_by_wordtopic = np.asarray(self.vocab_by_wordtopic__word_counts)
@@ -346,7 +373,8 @@ cdef class BOW_Paragraph_GibbsSampler():
 
     def save_state(self, output_dir):
         self.pythonize_vars()
-        np.savetxt(os.path.join(output_dir, 'pardoc_to_type.txt'), self.par_doc_to_type)
+        with open(os.path.join(output_dir, 'pardoc_to_type.txt'), 'w') as f:
+            json.dump(self.par_doc_to_type, f)
         np.savetxt(os.path.join(output_dir, 'doc_by_wordtopic.txt'), self.doc_by_wordtopic)
         np.savetxt(os.path.join(output_dir, 'partype_by_wordtopic.txt'), self.partype_by_wordtopic)
         np.savetxt(os.path.join(output_dir, 'vocab_by_wordtopic.txt'), self.vocab_by_wordtopic)
@@ -354,11 +382,15 @@ cdef class BOW_Paragraph_GibbsSampler():
 
 
     def __dealloc__(self):
-        PyMem_Free(self.docs)  # no-op if self.data is NULL
+        PyMem_Free(self.docs)
         PyMem_Free(self.num_words_per_par_per_doc)
         PyMem_Free(self.switching_variable)
         PyMem_Free(self.old_switching_variable)
         PyMem_Free(self.word_to_topic)
+        PyMem_Free(self.labels)
+        PyMem_Free(self.pardoc_to_type)
+        PyMem_Free(self.old_pardoc_to_type)
+        PyMem_Free(self.doc_has_labels)
 
     def sample_pass(self):
         self.sample_partype()

@@ -13,7 +13,7 @@ if __name__=="__main__":
     p.add_argument('-i', type=str, help="input directory.")
     p.add_argument('-o', type=str, help="output directory.")
     p.add_argument('-k', type=int, help="num topics.")
-    p.add_argument('-p', type=int, help="num personas.")
+    p.add_argument('-p', type=int, help="num paragraph types.")
     p.add_argument('-t', type=int, help="num iterations.")
     p.add_argument('--use-cached', default=False, action='store_true', dest='use_cached', help='use intermediate cached file.')
     args = p.parse_args()
@@ -29,13 +29,17 @@ if __name__=="__main__":
         docs = []
         for doc_str in doc_strs:
             if doc_str:
-                doc = json.loads(doc_str)
-                docs.append(doc['paragraphs'])
+                docs.append(json.loads(doc_str))
 
     vocab_fp = os.path.join(args.i, 'vocab.txt')
     vocab = open(vocab_fp).read().split('\n')
+    if 'label' in args.i:
+        num_partypes = len(set([l for doc in docs for l in doc['labels']])) - 1
+    else:
+        num_partypes = args.p
 
-    sampler = sampler_cy.BOW_Paragraph_GibbsSampler(docs=docs[:20000], vocab=vocab)
+    print('Training with %d partypes...' % num_partypes)
+    sampler = sampler_cy.BOW_Paragraph_GibbsSampler(docs=docs, vocab=vocab, num_partypes=num_partypes)
 
     ##
     cached_files = glob.glob(os.path.join(output_dir, 'trained-sampled-iter*'))
