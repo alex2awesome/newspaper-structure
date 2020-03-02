@@ -18,7 +18,7 @@ DTYPE = np.intc
 
 cdef double random_double(double max_num) nogil:
     cdef double n = rand()
-    cdef double d = RAND_MAX + 1
+    cdef long double d = RAND_MAX + 1L
     return n / d * max_num
 
 cdef int categorical(int k, double[:] p) nogil:

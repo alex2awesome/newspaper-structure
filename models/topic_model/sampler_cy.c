@@ -2762,19 +2762,19 @@ static PyObject *__pyx_codeobj__35;
  * 
  * cdef double random_double(double max_num) nogil:             # <<<<<<<<<<<<<<
  *     cdef double n = rand()
- *     cdef double d = RAND_MAX + 1
+ *     cdef long double d = RAND_MAX + 1L
  */
 
 static double __pyx_f_10sampler_cy_random_double(double __pyx_v_max_num) {
   double __pyx_v_n;
-  double __pyx_v_d;
+  long double __pyx_v_d;
   double __pyx_r;
 
   /* "sampler_cy.pyx":20
  * 
  * cdef double random_double(double max_num) nogil:
  *     cdef double n = rand()             # <<<<<<<<<<<<<<
- *     cdef double d = RAND_MAX + 1
+ *     cdef long double d = RAND_MAX + 1L
  *     return n / d * max_num
  */
   __pyx_v_n = rand();
@@ -2782,15 +2782,15 @@ static double __pyx_f_10sampler_cy_random_double(double __pyx_v_max_num) {
   /* "sampler_cy.pyx":21
  * cdef double random_double(double max_num) nogil:
  *     cdef double n = rand()
- *     cdef double d = RAND_MAX + 1             # <<<<<<<<<<<<<<
+ *     cdef long double d = RAND_MAX + 1L             # <<<<<<<<<<<<<<
  *     return n / d * max_num
  * 
  */
-  __pyx_v_d = (RAND_MAX + 1);
+  __pyx_v_d = (RAND_MAX + 1L);
 
   /* "sampler_cy.pyx":22
  *     cdef double n = rand()
- *     cdef double d = RAND_MAX + 1
+ *     cdef long double d = RAND_MAX + 1L
  *     return n / d * max_num             # <<<<<<<<<<<<<<
  * 
  * cdef int categorical(int k, double[:] p) nogil:
@@ -2803,7 +2803,7 @@ static double __pyx_f_10sampler_cy_random_double(double __pyx_v_max_num) {
  * 
  * cdef double random_double(double max_num) nogil:             # <<<<<<<<<<<<<<
  *     cdef double n = rand()
- *     cdef double d = RAND_MAX + 1
+ *     cdef long double d = RAND_MAX + 1L
  */
 
   /* function exit code */
