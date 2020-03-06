@@ -22,6 +22,7 @@ if __name__=='__main__':
     num_iterations = 1000
     kfold = 0
 
+    samplers = []
     for train_idx, test_idx in kf.split(labeled_data_idx):
         outdir = os.path.join('crossfold-topic-model', 'fold-%d' % kfold)
         os.makedirs(outdir, exist_ok=True)
@@ -31,12 +32,13 @@ if __name__=='__main__':
             data_input[idx]['has_labels'] = False
 
         ## sampler
-        sampler = sampler_cy.BOW_Paragraph_GibbsSampler(data_input, vocab=vocab)
-        sampler.initialize()
+        samplers.append( sampler_cy.BOW_Paragraph_GibbsSampler(data_input, vocab=vocab))
+        samplers[kfold].initialize()
         for i in tqdm(range(num_iterations)):
-            sampler.sample_pass()
-        sampler.save_state(outdir)
+            samplers[kfold].sample_pass()
+        samplers[kfold].save_state(outdir)
         np.savetxt(os.path.join(outdir, 'test-examples.txt'), test_examples)    
+        for idx in test_examples:
+            data_input[idx]['has_labels'] = True
         
         kfold += 1
-        del sampler
