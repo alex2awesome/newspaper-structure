@@ -1,6 +1,6 @@
 python3 \
 	-u discourse_tagger_generator_bert.py \
-	--repfile /mnt/c/Users/alexa/.keras/datasets/wwm_uncased_L-24_H-1024_A-16 \
+	--repfile /nas/home/spangher/.keras/datasets/wwm_uncased_L-24_H-1024_A-16 \
 	--train_file data/train_input.txt \
 	--validation_file data/val_input.txt \
 	--test_file data/test_input.txt \
@@ -23,3 +23,4 @@ python3 \
 	--save \
 	--maxseqlen 40 \
 	--maxclauselen 60
+	# --repfile /mnt/c/Users/alexa/.keras/datasets/wwm_uncased_L-24_H-1024_A-16 \
