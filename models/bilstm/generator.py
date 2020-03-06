@@ -146,7 +146,6 @@ class BertDiscourseGenerator(Sequence):
 
             ##
             bert_embedding = self.bert.predict([np.array(para_indices), np.array(para_segments)])[:, : self.maxclauselen, :]
-            print(bert_embedding.shape)
             if self.use_attention:
                 x[-seq_len:, :, :] = bert_embedding
             else:
