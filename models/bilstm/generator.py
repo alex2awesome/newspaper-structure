@@ -135,7 +135,6 @@ class BertDiscourseGenerator(Sequence):
                 str_seq = str_seq[:self.maxseqlen]
                 seq_len = self.maxseqlen
 
-            print(seq_len)
             para_indices = []
             para_segments = []
             for i, (clause, label) in enumerate(zip(str_seq, label_seq)):
@@ -145,10 +144,6 @@ class BertDiscourseGenerator(Sequence):
                 ##
                 y_ind[-seq_len+i] = self.label_ind[label]
 
-            print('para indices...')
-            print(np.array(para_indices).shape)
-            print('para segments...')
-            print(np.array(para_segments).shape)
             ##
             bert_embedding = self.bert.predict([np.array(para_indices), np.array(para_segments)])[:, : self.maxclauselen, :]
             print(bert_embedding.shape)
