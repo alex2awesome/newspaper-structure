@@ -1,0 +1,25 @@
+python3 \
+	-u discourse_tagger_generator_bert.py \
+	--repfile /mnt/c/Users/alexa/.keras/datasets/wwm_uncased_L-24_H-1024_A-16 \
+	--train_file data/train_input.txt \
+	--validation_file data/val_input.txt \
+	--test_file data/test_input.txt \
+	--use_attention \
+	--att_context clause \
+	--bidirectional \
+	--crf \
+	--lr 1e-3 \
+	--embedding_dropout 0.4 \
+	--high_dense_dropout 0.4 \
+	--attention_dropout 0.6 \
+	--lstm_dropout 0.5 \
+	--word_proj_dim 300 \
+	--epoch 20 \
+	--hard_k 0 \
+	--lstm_dim 350 \
+	--rec_hid_dim 75 \
+	--att_proj_dim 200 \
+	--batch_size 10 \
+	--save \
+	--maxseqlen 40 \
+	--maxclauselen 60
