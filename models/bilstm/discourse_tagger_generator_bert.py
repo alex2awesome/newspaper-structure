@@ -343,6 +343,8 @@ if __name__ == "__main__":
                     break
 
         print("Predicting on file %s"%(params["test_file"]))
+        if not os.path.exists('predictions'):
+            os.mkdir('predictions')
         test_out_file_name = "predictions/" + params["test_file"].split("/")[-1].replace(".txt", "") + model_name + ".out"
         outfile = open(test_out_file_name, "w")
         print("maxseqlen", params["maxseqlen"])
