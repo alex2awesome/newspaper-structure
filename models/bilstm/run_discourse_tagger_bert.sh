@@ -14,7 +14,7 @@ python3 \
 	--attention_dropout 0.6 \
 	--lstm_dropout 0.5 \
 	--word_proj_dim 300 \
-	--epoch 20 \
+	--epoch 100 \
 	--hard_k 0 \
 	--lstm_dim 350 \
 	--rec_hid_dim 75 \
